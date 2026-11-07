@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Particle Portrait</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #000;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Set canvas to fullscreen
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+        
+        // Particle color (light lavender)
+        const PARTICLE_COLOR = '#e6b6ff';
+        
+        // Animation speed
+        const ANIMATION_SPEED = 0.3;
+        
+        // Brightness threshold
+        const BRIGHTNESS_THRESHOLD = 0.02;
+        
+        let particles = [];
+        let imageLoaded = false;
+        
+        // Load the portrait image
+        const img = new Image();
+        img.src = 'portrait.jpg';
+        img.crossOrigin = 'anonymous';
+        
+        img.onload = () => {
+            imageLoaded = true;
+            generateParticles();
+            animate();
+        };
+        
+        img.onerror = () => {
+            console.error('Failed to load portrait.jpg');
+        };
+        
+        // Generate particles from image
+        function generateParticles() {
+            // Create temporary canvas to extract pixel data
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // Calculate scale to fit 90-92% of screen
+            const scale = Math.min(
+                (canvas.width * 0.92) / img.width,
+                (canvas.height * 0.92) / img.height
+            );
+            
+            const scaledWidth = img.width * scale;
+            const scaledHeight = img.height * scale;
+            
+            // Center the image on screen
+            const offsetX = (canvas.width - scaledWidth) / 2;
+            const offsetY = (canvas.height - scaledHeight) / 2;
+            
+            tempCanvas.width = img.width;
+            tempCanvas.height = img.height;
+            tempCtx.drawImage(img, 0, 0);
+            
+            // Get pixel data
+            const imageData = tempCtx.getImageData(0, 0, img.width, img.height);
+            const pixels = imageData.data;
+            
+            // Generate particles
+            for (let y = 0; y < img.height; y++) {
+                for (let x = 0; x < img.width; x++) {
+                    const i = (y * img.width + x) * 4;
+                    
+                    const r = pixels[i];
+                    const g = pixels[i + 1];
+                    const b = pixels[i + 2];
+                    
+                    // Calculate luminance (brightness)
+                    const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                    
+                    // Skip dark pixels
+                    if (brightness < BRIGHTNESS_THRESHOLD) continue;
+                    
+                    // Probability-based sampling based on brightness
+                    if (Math.random() > (0.92 - brightness * 0.6)) continue;
+                    
+                    // Create particle
+                    const particle = {
+                        // Random starting position
+                        x: Math.random() * canvas.width,
+                        y: Math.random() * canvas.height,
+                        // Target position (scaled and centered)
+                        targetX: offsetX + x * scale,
+                        targetY: offsetY + y * scale,
+                        // Brightness for size/alpha
+                        brightness: brightness,
+                        // Size: 1.0-1.5px based on brightness
+                        size: 1.0 + brightness * 0.5
+                    };
+                    
+                    particles.push(particle);
+                }
+            }
+            
+            console.log(`Generated ${particles.length} particles`);
+        }
+        
+        // Update particle position
+        function updateParticle(p) {
+            // Smooth convergence to target
+            p.x += (p.targetX - p.x) * ANIMATION_SPEED;
+            p.y += (p.targetY - p.y) * ANIMATION_SPEED;
+        }
+        
+        // Animation loop
+        function animate() {
+            // Clear canvas with black
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Update and draw all particles
+            ctx.fillStyle = PARTICLE_COLOR;
+            for (let i = 0; i < particles.length; i++) {
+                updateParticle(particles[i]);
+                const alpha = 0.3 + particles[i].brightness * 0.7;
+                ctx.globalAlpha = alpha;
+                ctx.fillRect(particles[i].x, particles[i].y, particles[i].size, particles[i].size);
+            }
+            
+            // Reset alpha
+            ctx.globalAlpha = 1;
+            
+            requestAnimationFrame(animate);
+        }
+    </script>
+</body>
+</html>
